@@ -29,7 +29,6 @@ import updateLogAndConfig.UpdateLog;
 public class LoadToDatabase {
 		public static void main(String[] args) throws EncryptedDocumentException, IOException {
 			LoadToDatabase ltd = new LoadToDatabase();
-			ltd.addColumn("", "MSSV,Holot,Ten,Ngaysinh,Malop,lop,sodienthoai,email,Quequan,ghichu", "MSSV_warehouse:varchar(8),Ten_warehouse:varchar(20),lop_warehouse:varchar(40),sodienthoai_warehouse:varchar(10)", "", "", "");
 		}
 		public boolean fileIsExsist(String config) {
 			String[] part = config.split("\t");
@@ -51,6 +50,26 @@ public class LoadToDatabase {
 			}
 			return numcol;
 		}
+		public boolean isEqualColNum(String listConfig) {
+			String[] part = listConfig.split("\t");
+			try {
+				int colNumExecute = getNumColOfTable(part[9], part[4], part[1], part[2]);
+				if(colNumExecute == Integer.parseInt(part[10])) {
+					return true;
+				}
+				
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			return false;
+		}
+		public void addAndInsert(String listConfig) {
+			String[] part = listConfig.split("\t");
+			String colName = addColumn(part[9], part[7], part[8], part[4], part[1], part[2]);
+			insertData(part[9], part[4], part[1], part[2], colName);
+			
+		}
 		public static String getListFileLoad() {
 			String list ="";
 	        int idConfig =0;
@@ -63,6 +82,7 @@ public class LoadToDatabase {
 			String listColumn = "";
 			String listWarehouseRequireCol = "";
 			String Staging_tabName = "";
+			int colNum = 0;
 	        try {
 				Connection connection_user = BaseConnection.getMySQLConnection();
 				connection_user.setAutoCommit(false);
@@ -80,7 +100,9 @@ public class LoadToDatabase {
 					listColumn = rs.getString(10);//7
 					listWarehouseRequireCol = rs.getString(11);//8
 					Staging_tabName = rs.getString(12);//9
-				list = idConfig+"\t"+username+"\t"+password+"\t"+localdir+"\t"+des_config+"\t"+fileType+"\t"+delimiter+"\t"+listColumn+"\t"+listWarehouseRequireCol+"\t"+Staging_tabName+"\n"; 
+					colNum = rs.getInt(13);//10
+					
+				list = idConfig+"\t"+username+"\t"+password+"\t"+localdir+"\t"+des_config+"\t"+fileType+"\t"+delimiter+"\t"+listColumn+"\t"+listWarehouseRequireCol+"\t"+Staging_tabName+"\t"+colNum+"\n"; 
 				}
 				connection_user.close();
 			} catch (SQLException | ClassNotFoundException e1) {
@@ -94,16 +116,6 @@ public class LoadToDatabase {
 			String log = getLogOf(1);
 			String[] f_log = log.split(",");
 			switch (fields[5]) {
-			case ".csv": {	
-				try {
-				loadFileCsv(Integer.parseInt(fields[0]),Integer.parseInt(f_log[0]),fields[3],fields[6], fields[4],fields[1], fields[2], fields[9]);
-					int numcol = getNumColOfTable(fields[9], fields[7], fields[1],fields[2]);
-					ul.updateLogWhenSuccess(Integer.parseInt(f_log[0]),numcol);
-					SendMail.sendMailToVertify("", "load file thanh cong", "");
-				}catch (Exception e) {
-					ul.updateLogWhenFail(Integer.parseInt(f_log[0]));
-				}
-			}
 			case ".xlsx": {
 				try {
 				loadFileExcel(Integer.parseInt(fields[0]),Integer.parseInt(f_log[0]),fields[3],fields[6], fields[4],fields[1], fields[2], fields[9]);
@@ -119,6 +131,18 @@ public class LoadToDatabase {
 				loadFileTxt(Integer.parseInt(fields[0]),Integer.parseInt(f_log[0]),fields[3],fields[6], fields[4],fields[1], fields[2], fields[9]);
 					int numcol = getNumColOfTable(fields[9], fields[7], fields[1],fields[2]);
 					ul.updateLogWhenSuccess(Integer.parseInt(f_log[0]), numcol);
+					SendMail.sendMailToVertify("", "load file thanh cong", "");
+				}catch (Exception e) {
+					ul.updateLogWhenFail(Integer.parseInt(f_log[0]));
+				}
+			}
+			case ".csv": {	
+				try {
+				loadFileCsv(Integer.parseInt(fields[0]),Integer.parseInt(f_log[0]),fields[3],fields[6], fields[4],fields[1], fields[2], fields[9]);
+					int numcol = getNumColOfTable(fields[9], fields[7], fields[1],fields[2]);
+					System.out.println("loadthanhcong");
+					ul.updateLogWhenFail(Integer.parseInt(f_log[0]));
+					ul.updateLogWhenSuccess(Integer.parseInt(f_log[0]),numcol);
 					SendMail.sendMailToVertify("", "load file thanh cong", "");
 				}catch (Exception e) {
 					ul.updateLogWhenFail(Integer.parseInt(f_log[0]));
@@ -187,10 +211,10 @@ public class LoadToDatabase {
 				}
 				Connection connection_user = DriverManager.getConnection(desConfig, user, password);
 				connection_user.setAutoCommit(false);
-				PreparedStatement stat = connection_user.prepareStatement("load data infile "+"'"+sourceConfig+"'"+" into table " +tableName+" CHARACTER SET latin1 FIELDS TERMINATED BY ',' ENCLOSED BY '\"' LINES TERMINATED BY '\\n' IGNORE 1 LINES (STT,MSSV,HoLot,Ten,Ngaysinh,Malop,lop,sodienthoai,email,Quequan,ghichu);");
+				PreparedStatement stat = connection_user.prepareStatement("load data infile "+"'"+sourceConfig+"'"+" into table " +tableName+" CHARACTER SET latin1 FIELDS TERMINATED BY ',' ENCLOSED BY '\"' LINES TERMINATED BY '\\n' IGNORE 1 LINES;");
 				stat.execute();
 				connection_user.commit();
-				connection_user.close();
+				connection_user.close();		
 			} catch (SQLException e1) {
 				e1.printStackTrace();
 			}
@@ -203,7 +227,8 @@ public class LoadToDatabase {
 				if(delimiter.equals("comma")) {
 					delimiter =",";
 				}
-				PreparedStatement stat = connection_user.prepareStatement("load data infile "+"'"+sourceConfig+"'"+" into table " +tableName+" CHARACTER SET latin1 FIELDS TERMINATED BY '"+delimiter+"' ENCLOSED BY '\"' LINES TERMINATED BY '\\r\\n' IGNORE 1 LINES (STT,MSSV,HoLot,Ten,Ngaysinh,Malop,lop,sodienthoai,email,Quequan,ghichu);");
+				
+				PreparedStatement stat = connection_user.prepareStatement("load data infile "+"'"+sourceConfig+"'"+" into table " +tableName+" CHARACTER SET latin1 FIELDS TERMINATED BY '"+delimiter+"' ENCLOSED BY '\"' LINES TERMINATED BY '\\r\\n' IGNORE 1 LINES");
 				stat.execute();
 				connection_user.commit();
 				connection_user.close();
@@ -219,11 +244,9 @@ public class LoadToDatabase {
 				String afterConvert = convertToCsv(sourceConfig);
 				File file = new File(afterConvert);
 				String source = file.getParent()+"\\\\"+file.getName();
-				System.out.println(desConfig+" "+user+" "+password);
 				Connection connection_user = DriverManager.getConnection(desConfig, user, password);
 				connection_user.setAutoCommit(false);
-				System.out.println("load data infile "+"'"+source+"'"+" into table " +tableName+" CHARACTER SET latin1 FIELDS TERMINATED BY '"+delimiter+"' ENCLOSED BY '\"' LINES TERMINATED BY '\\n' IGNORE 1 LINES (STT,MSSV,HoLot,Ten,Ngaysinh,Malop,lop,sodienthoai,email,Quequan,ghichu);");
-				PreparedStatement stat = connection_user.prepareStatement("load data infile "+"'"+source+"'"+" into table " +tableName+" CHARACTER SET latin1 FIELDS TERMINATED BY '"+delimiter+"' ENCLOSED BY '\"' LINES TERMINATED BY '\\n' IGNORE 1 LINES (STT,MSSV,HoLot,Ten,Ngaysinh,Malop,lop,sodienthoai,email,Quequan,ghichu);");
+				PreparedStatement stat = connection_user.prepareStatement("load data infile "+"'"+source+"'"+" into table " +tableName+" CHARACTER SET latin1 FIELDS TERMINATED BY '"+delimiter+"' ENCLOSED BY '\"' LINES TERMINATED BY '\\n' IGNORE 1 LINES ");
 				stat.execute();
 				connection_user.commit();
 				connection_user.close();
@@ -255,22 +278,22 @@ public class LoadToDatabase {
 				}else {
 				colAdd += columnName+":"+columnName.substring(0, columnName.indexOf('_'))+",";
 				}
-				command+= " ADD COLUMN '"+columnName+"'"+" "+type+" NULL AFTER "+temp+","+"\n";
+				command+= " ADD COLUMN `"+columnName+"`"+" "+type+" NULL AFTER "+temp+","+"\n";
 				temp = temp.replace(temp, columnName);
 			}
 			command = command.substring(0, command.length()-2);
-//			try {
-//				Connection connection_user = DriverManager.getConnection(desConfig, user, password);
-//				connection_user.setAutoCommit(false);
-//				PreparedStatement stat = connection_user.prepareStatement(command);
-//				stat.execute();
-//				connection_user.commit();
-//				connection_user.close();
-//			} catch (SQLException e) {
-//				// TODO Auto-generated catch block
-//				e.printStackTrace();
-//			}
-			System.out.println(colAdd);
+			try {
+				Connection connection_user = DriverManager.getConnection(desConfig, user, password);
+				connection_user.setAutoCommit(false);
+				PreparedStatement stat = connection_user.prepareStatement(command);
+				stat.executeUpdate();
+				connection_user.commit();
+				connection_user.close();
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			System.out.println(command);
 			return colAdd.substring(0,colAdd.length()-1);
 		}
 		public void insertData(String tableName,String desConfig,String user,String password,String colName) {
@@ -279,16 +302,20 @@ public class LoadToDatabase {
 			for (int i = 0; i < listWarehouse.length; i++) {
 				String[] part = listWarehouse[i].split(":");
 				if(part[1].split("va").length > 1) {
-					command += "update data1 set "+part[0]+" = concat("+part[1].split("va")[0]+", \" \","+part[1].split("va")[1]+");"+"\n";
+					command += "UPDATE data1 SET "+part[0]+" = concat("+part[1].split("va")[0]+", \" \","+part[1].split("va")[1]+");"+"\n";
 				}else {
 					command += "UPDATE data1 SET "+part[0]+" = "+part[1]+";"+"\n";
 				}
 			}
+			System.out.println(command);
 			try {
+				String[] step = command.split("\n"); 
 				Connection connection_user = DriverManager.getConnection(desConfig, user, password);
 				connection_user.setAutoCommit(false);
-				PreparedStatement stat = connection_user.prepareStatement("");
-				stat.executeUpdate();
+				for (int i = 0; i < step.length; i++) {
+					PreparedStatement stat = connection_user.prepareStatement(step[i]);
+					stat.execute();
+				}
 				connection_user.commit();
 				connection_user.close();
 			} catch (SQLException e) {
