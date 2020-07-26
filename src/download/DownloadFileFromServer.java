@@ -30,7 +30,7 @@ public class DownloadFileFromServer {
 		
 		CkScp scp = new CkScp();
 		scp.UseSsh(ssh);
-		scp.put_SyncMustMatch("sinhvien_*.xlsx");
+		scp.put_SyncMustMatch("sinhvien_*.*");
 		String remote_dir = "/volume1/ECEP/song.nguyen/DW_2020/data";
 		String local_dir = "data";
 		scp.SyncTreeDownload(remote_dir, local_dir, 0, false);
