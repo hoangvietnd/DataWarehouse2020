@@ -9,7 +9,7 @@ public class BaseConnection {
 		String hostName = "localhost";
 		String dbName = "control_database";
 		String userName = "root";
-		String password = "1234";
+		String password = "hvnd13051998";
 
 		return getMySQLConnection(hostName, dbName, userName, password);
 	}
@@ -20,5 +20,9 @@ public class BaseConnection {
 		String connectionURL = "jdbc:mysql://" + hostName + ":3306/" + dbName+"?useSSL=false&characterEncoding=utf8";
 		Connection conn = DriverManager.getConnection(connectionURL, userName, password);
 		return conn;
+	}
+	public static void main(String[] args) throws ClassNotFoundException, SQLException {
+		Connection mySQLConnection = getMySQLConnection();
+		System.out.println(mySQLConnection);
 	}
 }
